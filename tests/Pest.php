@@ -12,7 +12,17 @@
 */
 
 pest()->extend(Tests\TestCase::class)
- // ->use(Illuminate\Foundation\Testing\RefreshDatabase::class)
+    ->use(Illuminate\Foundation\Testing\RefreshDatabase::class)
+    ->beforeEach(function () {
+        // Generate Passport encryption keys (once, persisted to storage/)
+        if (! file_exists(storage_path('oauth-private.key'))) {
+            $this->artisan('passport:keys', ['--force' => true, '--no-interaction' => true]);
+        }
+
+        // Create a Passport personal access client (needed per test due to RefreshDatabase)
+        app(\Laravel\Passport\ClientRepository::class)
+            ->createPersonalAccessGrantClient('Test Personal Access Client');
+    })
     ->in('Feature');
 
 /*
@@ -44,4 +54,21 @@ expect()->extend('toBeOne', function () {
 function something()
 {
     // ..
+}
+
+/**
+ * Authenticate the test request with a real Passport Bearer token.
+ *
+ * Creates a personal access token for the given user and sets the
+ * Authorization header for all subsequent requests in the current test.
+ */
+function passportActingAs(App\Models\User $user): string
+{
+    $token = $user->createToken('test-token');
+
+    test()->withHeaders([
+        'Authorization' => 'Bearer ' . $token->accessToken,
+    ]);
+
+    return $token->accessToken;
 }

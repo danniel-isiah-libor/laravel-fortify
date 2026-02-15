@@ -1,0 +1,1108 @@
+{
+	"info": {
+		"_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+		"name": "Laravel Fortify API (Passport)",
+		"description": "A comprehensive Postman collection for the Laravel Fortify API secured with Laravel Passport personal access tokens.\n\n## Authentication Flow\n1. **Register** or **Login** to obtain a Passport Bearer token.\n2. The token is automatically stored in the `access_token` collection variable.\n3. All authenticated requests use the `{{access_token}}` variable in the Authorization header.\n\n## Two-Factor Authentication Flow\n1. Login returns `{ \"two_factor\": true }` when 2FA is enabled.\n2. Complete the challenge via the **Two-Factor Challenge** endpoint.\n3. The token is returned upon successful 2FA verification.\n\n## Password Confirmation\nSome endpoints (2FA management) require password confirmation within the last 3 hours. Call **Confirm Password** before accessing those routes.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8000",
+			"type": "string"
+		},
+		{
+			"key": "access_token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "user_email",
+			"value": "test@example.com",
+			"type": "string"
+		},
+		{
+			"key": "user_password",
+			"value": "Password123!",
+			"type": "string"
+		}
+	],
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{access_token}}",
+				"type": "string"
+			}
+		]
+	},
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"item": [
+		{
+			"name": "Authentication",
+			"description": "Endpoints for user login and logout. Login returns a Passport personal access token.",
+			"item": [
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"const response = pm.response.json();",
+									"",
+									"if (response.access_token) {",
+									"    pm.collectionVariables.set('access_token', response.access_token);",
+									"    pm.test('Access token saved to collection', function () {",
+									"        pm.expect(response.access_token).to.be.a('string');",
+									"        pm.expect(response.token_type).to.eql('Bearer');",
+									"    });",
+									"}",
+									"",
+									"if (response.two_factor) {",
+									"    pm.test('Two-factor challenge required', function () {",
+									"        pm.expect(response.two_factor).to.be.true;",
+									"    });",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"{{user_email}}\",\n    \"password\": \"{{user_password}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/login",
+							"host": ["{{base_url}}"],
+							"path": ["login"]
+						},
+						"description": "Authenticate a user and receive a Passport personal access token.\n\n**Response (success):**\n```json\n{\n    \"user\": { ... },\n    \"token_type\": \"Bearer\",\n    \"access_token\": \"eyJ...\",\n    \"expires_in\": 31536000\n}\n```\n\n**Response (2FA enabled):**\n```json\n{\n    \"two_factor\": true\n}\n```\n\nThe access token is automatically stored in the `access_token` collection variable."
+					},
+					"response": [
+						{
+							"name": "Success",
+							"status": "OK",
+							"code": 200,
+							"header": [
+								{ "key": "Content-Type", "value": "application/json" }
+							],
+							"body": "{\n    \"user\": {\n        \"id\": 1,\n        \"name\": \"Test User\",\n        \"email\": \"test@example.com\",\n        \"email_verified_at\": \"2026-02-15T06:00:00.000000Z\",\n        \"created_at\": \"2026-02-15T06:00:00.000000Z\",\n        \"updated_at\": \"2026-02-15T06:00:00.000000Z\"\n    },\n    \"token_type\": \"Bearer\",\n    \"access_token\": \"eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9...\",\n    \"expires_in\": 31536000\n}"
+						},
+						{
+							"name": "Two-Factor Required",
+							"status": "OK",
+							"code": 200,
+							"header": [
+								{ "key": "Content-Type", "value": "application/json" }
+							],
+							"body": "{\n    \"two_factor\": true\n}"
+						},
+						{
+							"name": "Validation Error",
+							"status": "Unprocessable Entity",
+							"code": 422,
+							"header": [
+								{ "key": "Content-Type", "value": "application/json" }
+							],
+							"body": "{\n    \"message\": \"These credentials do not match our records.\",\n    \"errors\": {\n        \"email\": [\n            \"These credentials do not match our records.\"\n        ]\n    }\n}"
+						},
+						{
+							"name": "Rate Limited",
+							"status": "Too Many Requests",
+							"code": 429,
+							"header": [
+								{ "key": "Content-Type", "value": "application/json" }
+							],
+							"body": "{\n    \"message\": \"Too many login attempts. Please try again in 60 seconds.\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Logout",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Logged out successfully (204 No Content)', function () {",
+									"    pm.response.to.have.status(204);",
+									"});",
+									"",
+									"pm.collectionVariables.set('access_token', '');"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/logout",
+							"host": ["{{base_url}}"],
+							"path": ["logout"]
+						},
+						"description": "Logout the authenticated user. Returns 204 No Content.\n\nThe stored access token is cleared from the collection variable. The frontend should discard the token."
+					},
+					"response": [
+						{
+							"name": "Success",
+							"status": "No Content",
+							"code": 204,
+							"header": [],
+							"body": ""
+						},
+						{
+							"name": "Unauthenticated",
+							"status": "Unauthorized",
+							"code": 401,
+							"header": [
+								{ "key": "Content-Type", "value": "application/json" }
+							],
+							"body": "{\n    \"message\": \"Unauthenticated.\"\n}"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Registration",
+			"description": "User registration endpoint. Returns a Passport token upon successful registration.",
+			"item": [
+				{
+					"name": "Register",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"const response = pm.response.json();",
+									"",
+									"if (response.access_token) {",
+									"    pm.collectionVariables.set('access_token', response.access_token);",
+									"    pm.test('Registered and access token saved', function () {",
+									"        pm.response.to.have.status(201);",
+									"        pm.expect(response.access_token).to.be.a('string');",
+									"        pm.expect(response.token_type).to.eql('Bearer');",
+									"    });",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Test User\",\n    \"email\": \"{{user_email}}\",\n    \"password\": \"{{user_password}}\",\n    \"password_confirmation\": \"{{user_password}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/register",
+							"host": ["{{base_url}}"],
+							"path": ["register"]
+						},
+						"description": "Register a new user account.\n\n**Response (201 Created):**\n```json\n{\n    \"user\": { ... },\n    \"token_type\": \"Bearer\",\n    \"access_token\": \"eyJ...\",\n    \"expires_in\": 31536000\n}\n```\n\nThe access token is automatically stored in the `access_token` collection variable."
+					},
+					"response": [
+						{
+							"name": "Success",
+							"status": "Created",
+							"code": 201,
+							"header": [
+								{ "key": "Content-Type", "value": "application/json" }
+							],
+							"body": "{\n    \"user\": {\n        \"id\": 1,\n        \"name\": \"Test User\",\n        \"email\": \"test@example.com\",\n        \"created_at\": \"2026-02-15T06:00:00.000000Z\",\n        \"updated_at\": \"2026-02-15T06:00:00.000000Z\"\n    },\n    \"token_type\": \"Bearer\",\n    \"access_token\": \"eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9...\",\n    \"expires_in\": 31536000\n}"
+						},
+						{
+							"name": "Validation Error",
+							"status": "Unprocessable Entity",
+							"code": 422,
+							"header": [
+								{ "key": "Content-Type", "value": "application/json" }
+							],
+							"body": "{\n    \"message\": \"The email has already been taken.\",\n    \"errors\": {\n        \"email\": [\n            \"The email has already been taken.\"\n        ]\n    }\n}"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Password Reset",
+			"description": "Forgot password and reset password endpoints. These are guest-only routes (no auth required).",
+			"item": [
+				{
+					"name": "Forgot Password (Request Reset Link)",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"{{user_email}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/forgot-password",
+							"host": ["{{base_url}}"],
+							"path": ["forgot-password"]
+						},
+						"description": "Send a password reset link to the given email address.\n\n**Response (200):**\n```json\n{\n    \"message\": \"We have emailed your password reset link.\"\n}\n```"
+					},
+					"response": [
+						{
+							"name": "Success",
+							"status": "OK",
+							"code": 200,
+							"header": [
+								{ "key": "Content-Type", "value": "application/json" }
+							],
+							"body": "{\n    \"message\": \"We have emailed your password reset link.\"\n}"
+						},
+						{
+							"name": "Validation Error",
+							"status": "Unprocessable Entity",
+							"code": 422,
+							"header": [
+								{ "key": "Content-Type", "value": "application/json" }
+							],
+							"body": "{\n    \"message\": \"The email field is required.\",\n    \"errors\": {\n        \"email\": [\n            \"The email field is required.\"\n        ]\n    }\n}"
+						}
+					]
+				},
+				{
+					"name": "Reset Password",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"token\": \"<reset-token-from-email>\",\n    \"email\": \"{{user_email}}\",\n    \"password\": \"NewPassword123!\",\n    \"password_confirmation\": \"NewPassword123!\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/reset-password",
+							"host": ["{{base_url}}"],
+							"path": ["reset-password"]
+						},
+						"description": "Reset the user's password using the token from the reset email.\n\n**Response (200):**\n```json\n{\n    \"message\": \"Your password has been reset.\"\n}\n```"
+					},
+					"response": [
+						{
+							"name": "Success",
+							"status": "OK",
+							"code": 200,
+							"header": [
+								{ "key": "Content-Type", "value": "application/json" }
+							],
+							"body": "{\n    \"message\": \"Your password has been reset.\"\n}"
+						},
+						{
+							"name": "Invalid Token",
+							"status": "Unprocessable Entity",
+							"code": 422,
+							"header": [
+								{ "key": "Content-Type", "value": "application/json" }
+							],
+							"body": "{\n    \"message\": \"This password reset token is invalid.\",\n    \"errors\": {\n        \"email\": [\n            \"This password reset token is invalid.\"\n        ]\n    }\n}"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Email Verification",
+			"description": "Email verification endpoints. Require authentication via Bearer token.",
+			"item": [
+				{
+					"name": "Send Verification Notification",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/email/verification-notification",
+							"host": ["{{base_url}}"],
+							"path": ["email", "verification-notification"]
+						},
+						"description": "Resend the email verification notification to the authenticated user.\n\n**Response (202):** Verification email sent.\n**Response (204):** Email already verified."
+					},
+					"response": [
+						{
+							"name": "Notification Sent",
+							"status": "Accepted",
+							"code": 202,
+							"header": [
+								{ "key": "Content-Type", "value": "application/json" }
+							],
+							"body": "{\n    \"message\": \"A new verification link has been sent to the email address you provided during registration.\"\n}"
+						},
+						{
+							"name": "Already Verified",
+							"status": "No Content",
+							"code": 204,
+							"header": [],
+							"body": ""
+						},
+						{
+							"name": "Unauthenticated",
+							"status": "Unauthorized",
+							"code": 401,
+							"header": [
+								{ "key": "Content-Type", "value": "application/json" }
+							],
+							"body": "{\n    \"message\": \"Unauthenticated.\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Verify Email",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/email/verify/:id/:hash?expires=&signature=",
+							"host": ["{{base_url}}"],
+							"path": ["email", "verify", ":id", ":hash"],
+							"query": [
+								{
+									"key": "expires",
+									"value": "",
+									"description": "Expiration timestamp from the signed URL"
+								},
+								{
+									"key": "signature",
+									"value": "",
+									"description": "Signature from the signed URL"
+								}
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "1",
+									"description": "User ID"
+								},
+								{
+									"key": "hash",
+									"value": "",
+									"description": "SHA1 hash of the user's email"
+								}
+							]
+						},
+						"description": "Verify the user's email address using the signed URL from the verification email.\n\nThis URL is sent in the verification notification email. Copy the full URL params (`id`, `hash`, `expires`, `signature`) from the email link.\n\n**Response (200):** Email verified successfully.\n**Response (403):** Invalid hash or expired link."
+					},
+					"response": [
+						{
+							"name": "Success",
+							"status": "OK",
+							"code": 200,
+							"header": [
+								{ "key": "Content-Type", "value": "application/json" }
+							],
+							"body": ""
+						},
+						{
+							"name": "Forbidden (Invalid Hash)",
+							"status": "Forbidden",
+							"code": 403,
+							"header": [
+								{ "key": "Content-Type", "value": "application/json" }
+							],
+							"body": "{\n    \"message\": \"Invalid signature.\"\n}"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Profile Information",
+			"description": "Update user profile information. Requires authentication.",
+			"item": [
+				{
+					"name": "Update Profile Information",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Updated Name\",\n    \"email\": \"{{user_email}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/user/profile-information",
+							"host": ["{{base_url}}"],
+							"path": ["user", "profile-information"]
+						},
+						"description": "Update the authenticated user's name and/or email.\n\nIf the email is changed and the User model implements `MustVerifyEmail`, the `email_verified_at` field is reset and a new verification email is sent.\n\n**Response (200):** Profile updated successfully."
+					},
+					"response": [
+						{
+							"name": "Success",
+							"status": "OK",
+							"code": 200,
+							"header": [
+								{ "key": "Content-Type", "value": "application/json" }
+							],
+							"body": "{\n    \"message\": \"Profile information updated.\"\n}"
+						},
+						{
+							"name": "Validation Error",
+							"status": "Unprocessable Entity",
+							"code": 422,
+							"header": [
+								{ "key": "Content-Type", "value": "application/json" }
+							],
+							"body": "{\n    \"message\": \"The name field is required.\",\n    \"errors\": {\n        \"name\": [\n            \"The name field is required.\"\n        ]\n    }\n}"
+						},
+						{
+							"name": "Unauthenticated",
+							"status": "Unauthorized",
+							"code": 401,
+							"header": [
+								{ "key": "Content-Type", "value": "application/json" }
+							],
+							"body": "{\n    \"message\": \"Unauthenticated.\"\n}"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Password Management",
+			"description": "Update password and confirm password endpoints. Require authentication.",
+			"item": [
+				{
+					"name": "Update Password",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"current_password\": \"{{user_password}}\",\n    \"password\": \"NewPassword123!\",\n    \"password_confirmation\": \"NewPassword123!\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/user/password",
+							"host": ["{{base_url}}"],
+							"path": ["user", "password"]
+						},
+						"description": "Update the authenticated user's password.\n\nRequires the current password for verification.\n\n**Response (200):** Password updated successfully."
+					},
+					"response": [
+						{
+							"name": "Success",
+							"status": "OK",
+							"code": 200,
+							"header": [
+								{ "key": "Content-Type", "value": "application/json" }
+							],
+							"body": "{\n    \"message\": \"Password updated.\"\n}"
+						},
+						{
+							"name": "Wrong Current Password",
+							"status": "Unprocessable Entity",
+							"code": 422,
+							"header": [
+								{ "key": "Content-Type", "value": "application/json" }
+							],
+							"body": "{\n    \"message\": \"The provided password does not match your current password.\",\n    \"errors\": {\n        \"current_password\": [\n            \"The provided password does not match your current password.\"\n        ]\n    }\n}"
+						}
+					]
+				},
+				{
+					"name": "Confirm Password",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Password confirmed (201)', function () {",
+									"    pm.response.to.have.status(201);",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"password\": \"{{user_password}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/user/confirm-password",
+							"host": ["{{base_url}}"],
+							"path": ["user", "confirm-password"]
+						},
+						"description": "Confirm the authenticated user's password. Required before accessing protected actions like enabling/disabling two-factor authentication.\n\nPassword confirmation is valid for 3 hours (configurable via `auth.password_timeout`).\n\n**Response (201):** Password confirmed."
+					},
+					"response": [
+						{
+							"name": "Success",
+							"status": "Created",
+							"code": 201,
+							"header": [
+								{ "key": "Content-Type", "value": "application/json" }
+							],
+							"body": "{\n    \"message\": \"Password confirmed.\"\n}"
+						},
+						{
+							"name": "Wrong Password",
+							"status": "Unprocessable Entity",
+							"code": 422,
+							"header": [
+								{ "key": "Content-Type", "value": "application/json" }
+							],
+							"body": "{\n    \"message\": \"The provided password was incorrect.\",\n    \"errors\": {\n        \"password\": [\n            \"The provided password was incorrect.\"\n        ]\n    }\n}"
+						}
+					]
+				},
+				{
+					"name": "Confirmed Password Status",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/user/confirmed-password-status",
+							"host": ["{{base_url}}"],
+							"path": ["user", "confirmed-password-status"]
+						},
+						"description": "Check whether the user's password has been recently confirmed.\n\n**Response (200):**\n```json\n{\n    \"confirmed\": true\n}\n```"
+					},
+					"response": [
+						{
+							"name": "Confirmed",
+							"status": "OK",
+							"code": 200,
+							"header": [
+								{ "key": "Content-Type", "value": "application/json" }
+							],
+							"body": "{\n    \"confirmed\": true\n}"
+						},
+						{
+							"name": "Not Confirmed",
+							"status": "OK",
+							"code": 200,
+							"header": [
+								{ "key": "Content-Type", "value": "application/json" }
+							],
+							"body": "{\n    \"confirmed\": false\n}"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Two-Factor Authentication",
+			"description": "Manage two-factor authentication (TOTP). Most endpoints require prior password confirmation.\n\n### Typical 2FA Setup Flow:\n1. **Confirm Password** → `POST /user/confirm-password`\n2. **Enable 2FA** → `POST /user/two-factor-authentication`\n3. **Get QR Code** → `GET /user/two-factor-qr-code`\n4. **Scan QR code** with authenticator app\n5. **Confirm 2FA** → `POST /user/confirmed-two-factor-authentication` with TOTP code\n6. **Get Recovery Codes** → `GET /user/two-factor-recovery-codes`",
+			"item": [
+				{
+					"name": "Enable Two-Factor Authentication",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/user/two-factor-authentication",
+							"host": ["{{base_url}}"],
+							"path": ["user", "two-factor-authentication"]
+						},
+						"description": "Enable two-factor authentication for the authenticated user.\n\n**Requires:** Password confirmation (call `POST /user/confirm-password` first).\n\nAfter enabling, use the QR code or secret key endpoint to set up the authenticator app, then confirm with a valid TOTP code.\n\n**Response (200):** 2FA enabled."
+					},
+					"response": [
+						{
+							"name": "Success",
+							"status": "OK",
+							"code": 200,
+							"header": [
+								{ "key": "Content-Type", "value": "application/json" }
+							],
+							"body": ""
+						},
+						{
+							"name": "Password Not Confirmed",
+							"status": "Locked",
+							"code": 423,
+							"header": [
+								{ "key": "Content-Type", "value": "application/json" }
+							],
+							"body": "{\n    \"message\": \"Password confirmation required.\"\n}"
+						},
+						{
+							"name": "Unauthenticated",
+							"status": "Unauthorized",
+							"code": 401,
+							"header": [
+								{ "key": "Content-Type", "value": "application/json" }
+							],
+							"body": "{\n    \"message\": \"Unauthenticated.\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Get Two-Factor QR Code",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/user/two-factor-qr-code",
+							"host": ["{{base_url}}"],
+							"path": ["user", "two-factor-qr-code"]
+						},
+						"description": "Get the SVG QR code and URL for setting up the authenticator app.\n\n**Requires:** Password confirmation + 2FA enabled.\n\n**Response (200):**\n```json\n{\n    \"svg\": \"<svg>...</svg>\",\n    \"url\": \"otpauth://totp/...\"\n}\n```"
+					},
+					"response": [
+						{
+							"name": "Success",
+							"status": "OK",
+							"code": 200,
+							"header": [
+								{ "key": "Content-Type", "value": "application/json" }
+							],
+							"body": "{\n    \"svg\": \"<svg xmlns=\\\"http://www.w3.org/2000/svg\\\" ...></svg>\",\n    \"url\": \"otpauth://totp/MyApp:test@example.com?secret=JBSWY3DPEHPK3PXP&issuer=MyApp\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Get Two-Factor Secret Key",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/user/two-factor-secret-key",
+							"host": ["{{base_url}}"],
+							"path": ["user", "two-factor-secret-key"]
+						},
+						"description": "Get the plain-text secret key for manual entry into the authenticator app.\n\n**Requires:** Password confirmation + 2FA enabled.\n\n**Response (200):**\n```json\n{\n    \"secretKey\": \"JBSWY3DPEHPK3PXP\"\n}\n```"
+					},
+					"response": [
+						{
+							"name": "Success",
+							"status": "OK",
+							"code": 200,
+							"header": [
+								{ "key": "Content-Type", "value": "application/json" }
+							],
+							"body": "{\n    \"secretKey\": \"JBSWY3DPEHPK3PXP\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Confirm Two-Factor Authentication",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"code\": \"123456\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/user/confirmed-two-factor-authentication",
+							"host": ["{{base_url}}"],
+							"path": ["user", "confirmed-two-factor-authentication"]
+						},
+						"description": "Confirm the two-factor authentication setup by providing a valid TOTP code from the authenticator app.\n\n**Requires:** Password confirmation + 2FA enabled.\n\nThis must be done after enabling 2FA and scanning the QR code. Until confirmed, 2FA will not be enforced during login.\n\n**Response (200):** 2FA confirmed and active."
+					},
+					"response": [
+						{
+							"name": "Success",
+							"status": "OK",
+							"code": 200,
+							"header": [
+								{ "key": "Content-Type", "value": "application/json" }
+							],
+							"body": ""
+						},
+						{
+							"name": "Invalid Code",
+							"status": "Unprocessable Entity",
+							"code": 422,
+							"header": [
+								{ "key": "Content-Type", "value": "application/json" }
+							],
+							"body": "{\n    \"message\": \"The provided two factor authentication code was invalid.\",\n    \"errors\": {\n        \"code\": [\n            \"The provided two factor authentication code was invalid.\"\n        ]\n    }\n}"
+						}
+					]
+				},
+				{
+					"name": "Get Recovery Codes",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/user/two-factor-recovery-codes",
+							"host": ["{{base_url}}"],
+							"path": ["user", "two-factor-recovery-codes"]
+						},
+						"description": "Get the current two-factor recovery codes.\n\n**Requires:** Password confirmation + 2FA enabled and confirmed.\n\n**Response (200):**\n```json\n[\n    \"abc12-def34\",\n    \"ghi56-jkl78\",\n    \"mno90-pqr12\",\n    ...\n]\n```"
+					},
+					"response": [
+						{
+							"name": "Success",
+							"status": "OK",
+							"code": 200,
+							"header": [
+								{ "key": "Content-Type", "value": "application/json" }
+							],
+							"body": "[\n    \"abc12-def34\",\n    \"ghi56-jkl78\",\n    \"mno90-pqr12\",\n    \"stu34-vwx56\",\n    \"yza78-bcd90\",\n    \"efg12-hij34\",\n    \"klm56-nop78\",\n    \"qrs90-tuv12\"\n]"
+						}
+					]
+				},
+				{
+					"name": "Regenerate Recovery Codes",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/user/two-factor-recovery-codes",
+							"host": ["{{base_url}}"],
+							"path": ["user", "two-factor-recovery-codes"]
+						},
+						"description": "Generate a new set of two-factor recovery codes. The old codes are invalidated.\n\n**Requires:** Password confirmation + 2FA enabled and confirmed.\n\n**Response (200):** New recovery codes generated."
+					},
+					"response": [
+						{
+							"name": "Success",
+							"status": "OK",
+							"code": 200,
+							"header": [
+								{ "key": "Content-Type", "value": "application/json" }
+							],
+							"body": ""
+						}
+					]
+				},
+				{
+					"name": "Disable Two-Factor Authentication",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/user/two-factor-authentication",
+							"host": ["{{base_url}}"],
+							"path": ["user", "two-factor-authentication"]
+						},
+						"description": "Disable two-factor authentication for the authenticated user.\n\n**Requires:** Password confirmation.\n\nThis removes the 2FA secret, recovery codes, and confirmation timestamp.\n\n**Response (200):** 2FA disabled."
+					},
+					"response": [
+						{
+							"name": "Success",
+							"status": "OK",
+							"code": 200,
+							"header": [
+								{ "key": "Content-Type", "value": "application/json" }
+							],
+							"body": ""
+						},
+						{
+							"name": "Password Not Confirmed",
+							"status": "Locked",
+							"code": 423,
+							"header": [
+								{ "key": "Content-Type", "value": "application/json" }
+							],
+							"body": "{\n    \"message\": \"Password confirmation required.\"\n}"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Two-Factor Challenge",
+			"description": "Complete the two-factor authentication challenge during login. This is a guest route — no Bearer token required.",
+			"item": [
+				{
+					"name": "Two-Factor Challenge (TOTP Code)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"const response = pm.response.json();",
+									"",
+									"if (response.access_token) {",
+									"    pm.collectionVariables.set('access_token', response.access_token);",
+									"    pm.test('2FA passed and access token saved', function () {",
+									"        pm.expect(response.access_token).to.be.a('string');",
+									"        pm.expect(response.token_type).to.eql('Bearer');",
+									"    });",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"code\": \"123456\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/two-factor-challenge",
+							"host": ["{{base_url}}"],
+							"path": ["two-factor-challenge"]
+						},
+						"description": "Complete the two-factor challenge using a TOTP code from the authenticator app.\n\n**Prerequisite:** A prior login attempt must have returned `{ \"two_factor\": true }`. The session stores the pending login state.\n\n**Response (success):**\n```json\n{\n    \"user\": { ... },\n    \"token_type\": \"Bearer\",\n    \"access_token\": \"eyJ...\",\n    \"expires_in\": 31536000\n}\n```\n\nThe access token is automatically stored in the `access_token` collection variable."
+					},
+					"response": [
+						{
+							"name": "Success",
+							"status": "OK",
+							"code": 200,
+							"header": [
+								{ "key": "Content-Type", "value": "application/json" }
+							],
+							"body": "{\n    \"user\": {\n        \"id\": 1,\n        \"name\": \"Test User\",\n        \"email\": \"test@example.com\"\n    },\n    \"token_type\": \"Bearer\",\n    \"access_token\": \"eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9...\",\n    \"expires_in\": 31536000\n}"
+						},
+						{
+							"name": "Invalid Code",
+							"status": "Unprocessable Entity",
+							"code": 422,
+							"header": [
+								{ "key": "Content-Type", "value": "application/json" }
+							],
+							"body": "{\n    \"message\": \"The provided two factor authentication code was invalid.\",\n    \"errors\": {\n        \"code\": [\n            \"The provided two factor authentication code was invalid.\"\n        ]\n    }\n}"
+						}
+					]
+				},
+				{
+					"name": "Two-Factor Challenge (Recovery Code)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"const response = pm.response.json();",
+									"",
+									"if (response.access_token) {",
+									"    pm.collectionVariables.set('access_token', response.access_token);",
+									"    pm.test('2FA recovery passed and access token saved', function () {",
+									"        pm.expect(response.access_token).to.be.a('string');",
+									"        pm.expect(response.token_type).to.eql('Bearer');",
+									"    });",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"recovery_code\": \"abc12-def34\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/two-factor-challenge",
+							"host": ["{{base_url}}"],
+							"path": ["two-factor-challenge"]
+						},
+						"description": "Complete the two-factor challenge using a recovery code (if the authenticator app is unavailable).\n\n**Prerequisite:** Login attempt returned `{ \"two_factor\": true }`.\n\nThe used recovery code is consumed and cannot be reused.\n\n**Response (success):**\n```json\n{\n    \"user\": { ... },\n    \"token_type\": \"Bearer\",\n    \"access_token\": \"eyJ...\",\n    \"expires_in\": 31536000\n}\n```"
+					},
+					"response": [
+						{
+							"name": "Success",
+							"status": "OK",
+							"code": 200,
+							"header": [
+								{ "key": "Content-Type", "value": "application/json" }
+							],
+							"body": "{\n    \"user\": {\n        \"id\": 1,\n        \"name\": \"Test User\",\n        \"email\": \"test@example.com\"\n    },\n    \"token_type\": \"Bearer\",\n    \"access_token\": \"eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9...\",\n    \"expires_in\": 31536000\n}"
+						},
+						{
+							"name": "Invalid Recovery Code",
+							"status": "Unprocessable Entity",
+							"code": 422,
+							"header": [
+								{ "key": "Content-Type", "value": "application/json" }
+							],
+							"body": "{\n    \"message\": \"The provided two factor recovery code was invalid.\"\n}"
+						}
+					]
+				}
+			]
+		}
+	]
+}
